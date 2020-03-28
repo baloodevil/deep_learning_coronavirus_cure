@@ -1,0 +1,1 @@
+Doug saw Jane .  Doug saw Spot .  Jane saw Doug .  Jane saw Spot .  Spot saw Jane .  Spot saw Doug .  
