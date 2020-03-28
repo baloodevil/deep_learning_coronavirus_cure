@@ -24,7 +24,8 @@ print(tokens[:250])
 # set makes it a unique list
 # list makes it an array
 vocab = list(set(tokens))
-print ('{} unique tokens'.format(len(vocab)))
+vocab_length = len(vocab)
+print ('{} unique tokens'.format(vocab_length))
 
 
 
@@ -42,24 +43,7 @@ print ('{} unique tokens'.format(len(vocab)))
 
 # %%
 # Creating a mapping from unique characters to indices
-token2idx = {u:get_vec(len(vocab),i) for i, u in enumerate(vocab)}
-idx2token = np.array(vocab)
-
-
-
-# text_as_int = np.array([token2idx[c] for c in tokens])
-
-# # %% [markdown]
-# # Now we have an integer representation for each character. Notice that we mapped the character as indexes from 0 to `len(unique)`.
-
-# # %%
-# print('{')
-# for char,_ in zip(token2idx, range(20)):
-#     print('  {:4s}: {:3d},'.format(repr(char), token2idx[char]))
-# print('  ...\n}')
-
-
-def get_vec(len_doc,word):
+def get_onehot(len_doc,word):
     empty_vector = [0] * len_doc
     vect = 0
     find = np.where( np.array(vocab) == word)[0][0]
@@ -70,10 +54,32 @@ def get_matrix(vocab):
     mat = []
     len_doc = len(vocab)
     for i in tokens:
-        vec = get_vec(len_doc,i)
+        vec = get_onehot(len_doc,i)
         mat.append(vec)
         
     return np.asarray(mat)
+
+  
+def mk_string_key(onehot):
+  return ','.join([ str(e) for e in onehot])
+
+token2onehot = {u:get_onehot(vocab_length,u) for i, u in enumerate(vocab)}
+#onehot2token = np.array(vocab)
+onehot2token = { mk_string_key(get_onehot(vocab_length, u)): u for i, u in enumerate(vocab)}      # { "0,0,1,0": "Jane", "0,1,0,0": "Doug", ... }
+
+
+# text_as_int = np.array([token2onehot[c] for c in tokens])
+
+# # %% [markdown]
+# # Now we have an integer representation for each character. Notice that we mapped the character as indexes from 0 to `len(unique)`.
+
+# # %%
+# print('{')
+# for char,_ in zip(token2onehot, range(20)):
+#     print('  {:4s}: {:3d},'.format(repr(char), token2onehot[char]))
+# print('  ...\n}')
+
+
 
 
 matrix_data = get_matrix(vocab)
@@ -119,21 +125,19 @@ examples_per_epoch = 24
 # Create training examples / targets
 word_dataset = tf.data.Dataset.from_tensor_slices(matrix_data) #text_as_int)
 
-print('here')
 for i in word_dataset.take(5):
   print(i)
-  # print(idx2token[i.numpy()])
-print('there')
+  # print(onehot2token[i.numpy()])
 
 # %% [markdown]
 # The `batch` method lets us easily convert these individual characters to sequences of the desired size.
 
 # %%
-sequences = word_dataset.batch(seq_length, drop_remainder=True)
+sequences = word_dataset.batch(seq_length + 1, drop_remainder=True)
 
 for item in sequences.take(5):
-  print(item)
-  #print(repr(''.join(idx2token[item.numpy()])))
+  print(" ".join([ onehot2token[mk_string_key(onehot)] for onehot in item.numpy() ]))
+  #print(repr(''.join(onehot2token[item.numpy()])))
 
 # %% [markdown]
 # For each sequence, duplicate and shift it to form the input and target text by using the `map` method to apply a simple function to each batch:
@@ -151,8 +155,13 @@ dataset = sequences.map(split_input_target)
 
 # %%
 for input_example, target_example in  dataset.take(1):
-  print ('Input data: ', repr(''.join(idx2token[input_example.numpy()])))
-  print ('Target data:', repr(''.join(idx2token[target_example.numpy()])))
+  print("Input")
+  print(" ".join([ onehot2token[mk_string_key(onehot)] for onehot in input_example.numpy()]))
+  print("Target")
+  print(" ".join([ onehot2token[mk_string_key(onehot)] for onehot in target_example.numpy()]))
+
+  #print ('Input data: ', repr(''.join(onehot2token[mk_string_key(input_example.numpy())])))
+  #print ('Target data:', repr(''.join(onehot2token[mk_string_key(target_example.numpy())])))
 
 
 
@@ -168,121 +177,122 @@ for input_example, target_example in  dataset.take(1):
 
 
 
-# # %% [markdown]
-# # Each index of these vectors are processed as one time step. For the input at time step 0, the model receives the index for "F" and trys to predict the index for "i" as the next character. At the next timestep, it does the same thing but the `RNN` considers the previous step context in addition to the current input character.
+# %% [markdown]
+# Each index of these vectors are processed as one time step. For the input at time step 0, the model receives the index for "F" and trys to predict the index for "i" as the next character. At the next timestep, it does the same thing but the `RNN` considers the previous step context in addition to the current input character.
 
-# # %%
-# for i, (input_idx, target_idx) in enumerate(zip(input_example[:5], target_example[:5])):
-#     print("Step {:4d}".format(i))
-#     print("  input: {} ({:s})".format(input_idx, repr(idx2token[input_idx])))
-#     print("  expected output: {} ({:s})".format(target_idx, repr(idx2token[target_idx])))
+# %%
+print('---------START----------')
+for i, (input_idx, target_idx) in enumerate(zip(input_example[:5], target_example[:5])):
+    print("Step {:4d}".format(i))
+    print("  input: {} ({:s})".format(input_idx, repr(onehot2token[mk_string_key(input_idx.numpy())])))
+    print("  expected output: {} ({:s})".format(target_idx, repr(onehot2token[mk_string_key(target_idx.numpy())])))
+print('---------END----------')
 
-# # %% [markdown]
-# # ### Create training batches
-# # 
-# # We used `tf.data` to split the text into manageable sequences. But before feeding this data into the model, we need to shuffle the data and pack it into batches.
+# %% [markdown]
+# ### Create training batches
+# 
+# We used `tf.data` to split the text into manageable sequences. But before feeding this data into the model, we need to shuffle the data and pack it into batches.
 
-# # %%
-# # Batch size
-# BATCH_SIZE = 64
+# %%
+# Batch size
+BATCH_SIZE = 6   # 64
 
-# # Buffer size to shuffle the dataset
-# # (TF data is designed to work with possibly infinite sequences,
-# # so it doesn't attempt to shuffle the entire sequence in memory. Instead,
-# # it maintains a buffer in which it shuffles elements).
-# BUFFER_SIZE = 10000
+# Buffer size to shuffle the dataset
+# (TF data is designed to work with possibly infinite sequences,
+# so it doesn't attempt to shuffle the entire sequence in memory. Instead,
+# it maintains a buffer in which it shuffles elements).
+BUFFER_SIZE = 10000
 
-# dataset = dataset.shuffle(BUFFER_SIZE).batch(BATCH_SIZE, drop_remainder=True)
+dataset = dataset.shuffle(BUFFER_SIZE).batch(BATCH_SIZE, drop_remainder=True)
 
-# dataset
+dataset
 
-# # %% [markdown]
-# # ## Build The Model
-# # %% [markdown]
-# # Use `tf.keras.Sequential` to define the model. For this simple example three layers are used to define our model:
-# # 
-# # * `tf.keras.layers.Embedding`: The input layer. A trainable lookup table that will map the numbers of each character to a vector with `embedding_dim` dimensions;
-# # * `tf.keras.layers.GRU`: A type of RNN with size `units=rnn_units` (You can also use a LSTM layer here.)
-# # * `tf.keras.layers.Dense`: The output layer, with `vocab_size` outputs.
+# %% [markdown]
+# ## Build The Model
+# %% [markdown]
+# Use `tf.keras.Sequential` to define the model. For this simple example three layers are used to define our model:
+# 
+# * `tf.keras.layers.Embedding`: The input layer. A trainable lookup table that will map the numbers of each character to a vector with `embedding_dim` dimensions;
+# * `tf.keras.layers.GRU`: A type of RNN with size `units=rnn_units` (You can also use a LSTM layer here.)
+# * `tf.keras.layers.Dense`: The output layer, with `vocab_length` outputs.
 
-# # %%
-# # Length of the vocabulary in chars
-# vocab_size = len(vocab)
+# %%
+# Length of the vocabulary in chars
 
-# # The embedding dimension
-# embedding_dim = 256
+# The embedding dimension
+embedding_dim = 256
 
-# # Number of RNN units
-# rnn_units = 1024
-
-
-# # %%
-# def build_model(vocab_size, embedding_dim, rnn_units, batch_size):
-#   model = tf.keras.Sequential([
-#     tf.keras.layers.Embedding(vocab_size, embedding_dim,
-#                               batch_input_shape=[batch_size, None]),
-#     tf.keras.layers.GRU(rnn_units,
-#                         return_sequences=True,
-#                         stateful=True,
-#                         recurrent_initializer='glorot_uniform'),
-#     tf.keras.layers.Dense(vocab_size)
-#   ])
-#   return model
+# Number of RNN units
+rnn_units = 1024
 
 
-# # %%
-# model = build_model(
-#   vocab_size = len(vocab),
-#   embedding_dim=embedding_dim,
-#   rnn_units=rnn_units,
-#   batch_size=BATCH_SIZE)
+# %%
+def build_model(vocab_length, embedding_dim, rnn_units, batch_size):
+  model = tf.keras.Sequential([
+    tf.keras.layers.Embedding(vocab_length, embedding_dim,
+                              batch_input_shape=[batch_size, None]),
+    tf.keras.layers.LSTM(rnn_units,         # GRU
+                        return_sequences=True,
+                        stateful=True,
+                        recurrent_initializer='glorot_uniform'),
+    tf.keras.layers.Dense(vocab_length)
+  ])
+  return model
 
-# # %% [markdown]
-# # For each character the model looks up the embedding, runs the GRU one timestep with the embedding as input, and applies the dense layer to generate logits predicting the log-likelihood of the next character:
-# # 
-# # ![A drawing of the data passing through the model](https://github.com/tensorflow/docs/blob/master/site/en/tutorials/text/images/text_generation_training.png?raw=1)
-# # %% [markdown]
-# # ## Try the model
-# # 
-# # Now run the model to see that it behaves as expected.
-# # 
-# # First check the shape of the output:
 
-# # %%
-# for input_example_batch, target_example_batch in dataset.take(1):
-#   example_batch_predictions = model(input_example_batch)
-#   print(example_batch_predictions.shape, "# (batch_size, sequence_length, vocab_size)")
+# %%
+model = build_model(
+  vocab_length = len(vocab),
+  embedding_dim=embedding_dim,
+  rnn_units=rnn_units,
+  batch_size=BATCH_SIZE)
 
-# # %% [markdown]
-# # In the above example the sequence length of the input is `100` but the model can be run on inputs of any length:
 
-# # %%
-# model.summary()
+# %% [markdown]
+# For each character the model looks up the embedding, runs the GRU one timestep with the embedding as input, and applies the dense layer to generate logits predicting the log-likelihood of the next character:
+# 
+# ![A drawing of the data passing through the model](https://github.com/tensorflow/docs/blob/master/site/en/tutorials/text/images/text_generation_training.png?raw=1)
+# %% [markdown]
+# ## Try the model
+# 
+# Now run the model to see that it behaves as expected.
+# 
+# First check the shape of the output:
 
-# # %% [markdown]
-# # To get actual predictions from the model we need to sample from the output distribution, to get actual character indices. This distribution is defined by the logits over the character vocabulary.
-# # 
-# # Note: It is important to _sample_ from this distribution as taking the _argmax_ of the distribution can easily get the model stuck in a loop.
-# # 
-# # Try it for the first example in the batch:
+# %%
+for input_example_batch, target_example_batch in dataset.take(1):
+  example_batch_predictions = model(input_example_batch)
+  print(example_batch_predictions.shape, "# (batch_size, sequence_length, vocab_length)")
 
-# # %%
-# sampled_indices = tf.random.categorical(example_batch_predictions[0], num_samples=1)
-# sampled_indices = tf.squeeze(sampled_indices,axis=-1).numpy()
+# %% [markdown]
+# In the above example the sequence length of the input is `100` but the model can be run on inputs of any length:
 
-# # %% [markdown]
-# # This gives us, at each timestep, a prediction of the next character index:
+# %%
+model.summary()
 
-# # %%
-# sampled_indices
+# %% [markdown]
+# To get actual predictions from the model we need to sample from the output distribution, to get actual character indices. This distribution is defined by the logits over the character vocabulary.
+# 
+# Note: It is important to _sample_ from this distribution as taking the _argmax_ of the distribution can easily get the model stuck in a loop.
+# 
+# Try it for the first example in the batch:
+# %%
+sampled_indices = tf.random.categorical(example_batch_predictions[0], num_samples=1)
+sampled_indices = tf.squeeze(sampled_indices,axis=-1).numpy()
 
-# # %% [markdown]
-# # Decode these to see the text predicted by this untrained model:
+# %% [markdown]
+# This gives us, at each timestep, a prediction of the next character index:
 
-# # %%
-# print("Input: \n", repr("".join(idx2token[input_example_batch[0]])))
-# print()
-# print("Next Char Predictions: \n", repr("".join(idx2token[sampled_indices ])))
+# %%
+sampled_indices
+
+# %% [markdown]
+# Decode these to see the text predicted by this untrained model:
+
+# %%
+print("Input: \n", repr("".join(onehot2token[input_example_batch[0]])))
+print()
+print("Next Char Predictions: \n", repr("".join(onehot2token[sampled_indices ])))
 
 # # %% [markdown]
 # # ## Train the model
@@ -301,7 +311,7 @@ for input_example, target_example in  dataset.take(1):
 #   return tf.keras.losses.sparse_categorical_crossentropy(labels, logits, from_logits=True)
 
 # example_batch_loss  = loss(target_example_batch, example_batch_predictions)
-# print("Prediction shape: ", example_batch_predictions.shape, " # (batch_size, sequence_length, vocab_size)")
+# print("Prediction shape: ", example_batch_predictions.shape, " # (batch_size, sequence_length, vocab_length)")
 # print("scalar_loss:      ", example_batch_loss.numpy().mean())
 
 # # %% [markdown]
@@ -354,7 +364,7 @@ for input_example, target_example in  dataset.take(1):
 
 
 # # %%
-# model = build_model(vocab_size, embedding_dim, rnn_units, batch_size=1)
+# model = build_model(vocab_length, embedding_dim, rnn_units, batch_size=1)
 
 # model.load_weights(tf.train.latest_checkpoint(checkpoint_dir))
 
@@ -390,7 +400,7 @@ for input_example, target_example in  dataset.take(1):
 #   num_generate = 1000
 
 #   # Converting our start string to numbers (vectorizing)
-#   input_eval = [token2idx[s] for s in start_string]
+#   input_eval = [token2onehot[s] for s in start_string]
 #   input_eval = tf.expand_dims(input_eval, 0)
 
 #   # Empty string to store our results
@@ -416,7 +426,7 @@ for input_example, target_example in  dataset.take(1):
 #       # along with the previous hidden state
 #       input_eval = tf.expand_dims([predicted_id], 0)
 
-#       text_generated.append(idx2token[predicted_id])
+#       text_generated.append(onehot2token[predicted_id])
 
 #   return (start_string + ''.join(text_generated))
 
@@ -453,7 +463,7 @@ for input_example, target_example in  dataset.take(1):
 
 # # %%
 # model = build_model(
-#   vocab_size = len(vocab),
+#   vocab_length = len(vocab),
 #   embedding_dim=embedding_dim,
 #   rnn_units=rnn_units,
 #   batch_size=BATCH_SIZE)
