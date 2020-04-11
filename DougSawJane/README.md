@@ -1,8 +1,6 @@
 # Hello World example of LSTM
 Modeled after Brandon Rohrer's [excellent video](https://www.youtube.com/watch?v=WCUNPb-5EYI) on the topic.
 
-Test
-
 ## All possible sentences...
 Doug saw Jane.  
 Doug saw Spot.  
