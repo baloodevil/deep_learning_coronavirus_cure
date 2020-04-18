@@ -113,6 +113,12 @@ Pipfile.lock
 
 training_checkpoints
 
+<<<<<<< HEAD
+node_modules/
+
+*.tfevents.*
+=======
 
 # matt's stuff
 Pipfile
+>>>>>>> e7b651173d68391510f1ba3f52567f21585a528b
