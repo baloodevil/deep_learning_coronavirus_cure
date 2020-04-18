@@ -112,3 +112,7 @@ Pipfile
 Pipfile.lock
 
 training_checkpoints
+
+node_modules/
+
+*.tfevents.*
