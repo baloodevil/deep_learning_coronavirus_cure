@@ -108,8 +108,6 @@ ENV/
 # local
 RDKit/
 .envrc
-Pipfile
-Pipfile.lock
 
 training_checkpoints
 
